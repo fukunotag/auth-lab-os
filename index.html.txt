@@ -1,0 +1,823 @@
+
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10131b">
+<title>Auth Lab OS</title>
+<meta name="description" content="Browser-based authentication experiment lab">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#10131b;--panel:rgba(28,33,45,.88);--panel-solid:#1c212d;
+  --panel-2:rgba(42,49,65,.82);--line:rgba(255,255,255,.12);
+  --text:#f4f6fb;--muted:#aab3c5;--accent:#8bb7ff;
+  --shadow:0 22px 70px rgba(0,0,0,.38);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}
+button{color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#desktop{
+  position:relative;width:100%;height:100%;
+  padding:26px 22px 82px;
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse at 18% 18%,rgba(68,107,170,.25),transparent 42%),
+    radial-gradient(ellipse at 78% 72%,rgba(106,80,161,.22),transparent 43%),
+    linear-gradient(135deg,#10131b,#171c28 58%,#10131b);
+}
+#desktop:before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.18;
+  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-size:44px 44px;
+}
+.desktop-header{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px}
+.brand-mark{width:38px;height:38px;border:1px solid #8bb7ff77;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#8bb7ff35,#c4a5ff18);font-size:19px}
+.header-right{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.glass-btn,.icon-btn{
+  border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:12px;
+  min-height:40px;padding:0 13px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)
+}
+.glass-btn:hover,.icon-btn:hover{background:rgba(255,255,255,.12)}
+.desktop-icons{position:relative;z-index:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,108px));gap:15px;margin-top:34px;align-content:start}
+.desktop-app{
+  border:1px solid transparent;background:transparent;border-radius:16px;padding:12px 7px;
+  display:flex;flex-direction:column;align-items:center;gap:9px;min-height:104px;text-align:center;
+}
+.desktop-app:hover,.desktop-app:focus-visible{background:rgba(255,255,255,.075);border-color:var(--line)}
+.app-icon{width:52px;height:52px;display:grid;place-items:center;border-radius:17px;font-size:25px;background:linear-gradient(145deg,rgba(139,183,255,.22),rgba(193,157,255,.13));border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px rgba(255,255,255,.12)}
+.app-label{font-size:12px;line-height:1.35;text-shadow:0 1px 8px #000}
+#windowLayer{position:absolute;inset:0 0 68px;z-index:3;pointer-events:none}
+.app-window{
+  position:absolute;left:calc(50% - 270px);top:calc(50% - 210px);
+  width:min(540px,calc(100vw - 28px));height:min(420px,calc(100% - 28px));
+  min-width:280px;min-height:190px;display:flex;flex-direction:column;overflow:hidden;
+  border:1px solid rgba(255,255,255,.16);border-radius:17px;background:rgba(25,30,41,.94);
+  box-shadow:var(--shadow);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);
+  pointer-events:auto;resize:both;
+}
+.app-window.maximized{left:8px!important;top:8px!important;width:calc(100% - 16px)!important;height:calc(100% - 16px)!important;resize:none;border-radius:14px}
+.app-window.minimized{display:none}
+.window-titlebar{height:48px;flex:0 0 48px;display:flex;align-items:center;gap:10px;padding:0 10px 0 15px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.035);touch-action:pan-y;user-select:none}
+.window-app-icon{width:27px;height:27px;border-radius:9px;display:grid;place-items:center;background:rgba(139,183,255,.15)}
+.window-title{font-size:13px;font-weight:650;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.window-controls{display:flex;gap:4px}
+.window-controls button{width:32px;height:30px;border:0;border-radius:8px;background:transparent;color:#dce3f1}
+.window-controls button:hover{background:rgba(255,255,255,.1)}
+.window-controls .close:hover{background:#c94350}
+.window-content{padding:20px;overflow:auto;flex:1;overscroll-behavior:contain}
+.window-content h2{margin:0 0 8px;font-size:21px}
+.window-content h3{margin:22px 0 8px;font-size:14px}
+.window-content p{color:var(--muted);line-height:1.65;font-size:14px}
+.field{display:flex;flex-direction:column;gap:7px;margin:13px 0}
+.field label{font-size:12px;color:var(--muted)}
+.field input,.field select{width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;background:#151a24;color:var(--text);padding:10px 12px}
+.primary-btn,.secondary-btn{border:1px solid transparent;border-radius:10px;padding:11px 14px;min-height:42px}
+.primary-btn{background:#8bb7ff;color:#111827;font-weight:700}
+.primary-btn:hover{background:#a6c8ff}
+.secondary-btn{background:rgba(255,255,255,.08);border-color:var(--line)}
+.button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.status{padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.035);font-size:13px;line-height:1.5;margin-top:14px}
+.status.good{border-color:#55c99b66;background:#55c99b12}
+.status.warn{border-color:#ffc66d66;background:#ffc66d12}
+.muted{color:var(--muted)}
+.small{font-size:12px!important}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
+.mini-card{padding:14px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.035)}
+.mini-card .big{font-size:24px;margin-bottom:8px}
+.mini-card strong{display:block;font-size:13px}
+.mini-card span{display:block;color:var(--muted);font-size:12px;line-height:1.45;margin-top:5px}
+#taskbar{
+  position:absolute;z-index:20;bottom:0;left:0;right:0;height:66px;padding:8px 14px calc(8px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:9px;border-top:1px solid rgba(255,255,255,.09);
+  background:rgba(17,21,30,.82);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px)
+}
+#startButton{height:44px;min-width:48px;padding:0 13px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.075);font-weight:700}
+#startButton:hover,#startButton.active{background:rgba(139,183,255,.18);border-color:#8bb7ff66}
+.taskbar-apps{display:flex;align-items:center;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.taskbar-apps::-webkit-scrollbar{display:none}
+.task-app{display:flex;align-items:center;gap:8px;min-width:43px;max-width:175px;height:43px;padding:0 12px;border:1px solid transparent;border-radius:12px;background:transparent;white-space:nowrap}
+.task-app:hover{background:rgba(255,255,255,.07)}
+.task-app.running{background:rgba(255,255,255,.055);border-color:var(--line)}
+.task-app.current:after{content:"";position:absolute;width:16px;height:3px;border-radius:3px;background:var(--accent);transform:translateY(20px)}
+.task-app span:last-child{overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.taskbar-tray{font-size:12px;color:var(--muted);white-space:nowrap;text-align:right;line-height:1.4}
+#startMenu{
+  position:absolute;z-index:25;bottom:76px;left:14px;width:min(440px,calc(100vw - 28px));max-height:min(600px,calc(100dvh - 100px));
+  padding:18px;border:1px solid var(--line);border-radius:21px;background:rgba(25,30,42,.96);
+  box-shadow:var(--shadow);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);overflow:auto
+}
+#startMenu[hidden]{display:none}
+.start-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.start-head strong{font-size:16px}
+.search{width:100%;height:42px;border:1px solid var(--line);border-radius:11px;background:rgba(0,0,0,.2);color:var(--text);padding:0 12px;margin-bottom:16px}
+.start-section{font-size:11px;letter-spacing:.8px;color:var(--muted);margin:12px 0}
+.start-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.start-app{border:1px solid transparent;border-radius:12px;background:transparent;padding:12px 5px;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0}
+.start-app:hover{background:rgba(255,255,255,.075);border-color:var(--line)}
+.start-app .app-icon{width:43px;height:43px;font-size:21px;border-radius:14px}
+.start-app span:last-child{font-size:11px;text-align:center;overflow-wrap:anywhere}
+.start-footer{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
+.toast{position:absolute;z-index:40;left:50%;bottom:82px;transform:translateX(-50%);padding:11px 15px;background:#202736;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);font-size:13px;max-width:calc(100vw - 30px);text-align:center}
+.toast[hidden]{display:none}
+.pattern-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(260px,100%);margin:18px auto}
+.pattern-dot{aspect-ratio:1;border-radius:50%;border:2px solid #8bb7ff99;background:rgba(139,183,255,.09);font-size:16px}
+.pattern-dot.selected{background:#8bb7ff;color:#101827;border-color:#c2dcff}
+@media(max-width:600px){
+  #desktop{padding:18px 12px 80px}
+  .header-right .date-label{display:none}
+  .desktop-icons{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:24px}
+  .desktop-app{min-height:92px;padding:8px 2px}
+  .app-icon{width:47px;height:47px}
+  .app-window{left:8px;top:8px;width:calc(100vw - 16px);height:calc(100% - 16px);min-width:0;min-height:0;resize:none;border-radius:15px}
+  .window-content{padding:16px}
+  .task-app{padding:0 9px}
+  .task-app span:last-child{display:none}
+  .task-app.current:after{transform:translateY(20px)}
+  .taskbar-tray{font-size:10px}
+}
+@media(max-height:500px){
+  #desktop{padding-top:12px}
+  .desktop-icons{margin-top:12px}
+  .app-window{top:5px;height:calc(100% - 10px)}
+  #windowLayer{bottom:62px}
+  #taskbar{height:60px}
+}
+</style>
+</head>
+<body>
+<div id="desktop">
+  <header class="desktop-header">
+    <div class="brand"><div class="brand-mark">⌘</div><div>Auth Lab OS<div class="muted small" style="font-weight:400;margin-top:2px">Authentication playground</div></div></div>
+    <div class="header-right"><span class="date-label">認証方式を、作って、試して、理解する。</span><button class="icon-btn" data-open="settings" aria-label="設定を開く">⚙</button></div>
+  </header>
+  <section class="desktop-icons" id="desktopIcons" aria-label="デスクトップアプリ"></section>
+  <div id="windowLayer" aria-label="アプリウィンドウ"></div>
+  <div id="startMenu" hidden>
+    <div class="start-head"><strong>アプリ</strong><span class="muted small">AUTH LAB</span></div>
+    <input class="search" id="appSearch" type="search" placeholder="アプリを検索…" aria-label="アプリを検索">
+    <div class="start-section">PINNED</div>
+    <div class="start-grid" id="startGrid"></div>
+    <div class="start-footer"><span class="muted small">Auth Lab OS · Local prototype</span><button class="secondary-btn" id="closeStart">閉じる</button></div>
+  </div>
+  <div id="toast" class="toast" hidden role="status"></div>
+  <footer id="taskbar">
+    <button id="startButton" aria-expanded="false" aria-controls="startMenu">◈ Start</button>
+    <div id="taskbarApps" class="taskbar-apps"></div>
+    <div class="taskbar-tray"><div id="clock">--:--</div><div id="date">----</div></div>
+  </footer>
+</div>
+<script>
+(() => {
+  'use strict';
+
+  const APP_DEFS = [
+    {id:'password',name:'Password Lab',icon:'🔑',category:'認証アプリ',description:'IDとパスワードを使う、基本の認証方式を試します。',kind:'password'},
+    {id:'pin',name:'PIN Lab',icon:'🔢',category:'認証アプリ',description:'数字コードの桁数や照合の仕組みを学びます。',kind:'pin'},
+    {id:'pattern',name:'Pattern Lab',icon:'🔵',category:'認証アプリ',description:'9点をつないでパターンロックを設定します。',kind:'pattern'},
+    {id:'image',name:'Image Lock',icon:'🖼️',category:'認証アプリ',description:'絵文字タイルを選ぶ画像型ロックの学習用デモです。',kind:'image'},
+    {id:'rhythm',name:'Rhythm Lock',icon:'🎵',category:'認証アプリ',description:'タップ間隔を記録して照合する学習用デモです。',kind:'rhythm'},
+    {id:'otp',name:'OTP Lab',icon:'⏱️',category:'認証アプリ',description:'TOTP形式の時間ベースコードをローカルで体験します。',kind:'otp'},
+    {id:'passkey',name:'Passkey Lab',icon:'🛡️',category:'認証アプリ',description:'パスキーと公開鍵認証について学びます。',kind:'placeholder',note:'本物のWebAuthn認証は、対応するオリジンとサーバー側検証を整えてから追加します。'},
+    {id:'builder',name:'Auth Builder',icon:'🧪',category:'システムツール',description:'実験用の認証アプリを作るための設計メモです。',kind:'builder'},
+    {id:'compare',name:'Auth Compare',icon:'📊',category:'システムツール',description:'認証方式の特徴を並べて比較します。',kind:'compare'},
+    {id:'settings',name:'Settings',icon:'⚙️',category:'システムツール',description:'OSの表示やローカルデータを管理します。',kind:'settings'},
+    {id:'api',name:'API Manager',icon:'🧩',category:'システムツール',description:'ブラウザAPIの対応状況と権限を確認します。',kind:'api'},
+    ...[
+      ['passphrase','Passphrase Lab','🔐','知識認証','長いフレーズを使う認証','知識認証の学習用シミュレーションです。'],
+      ['security-question','Security Question Lab','❓','知識認証','秘密の質問を使う方式','推測されにくさや運用上の弱点を学ぶシミュレーションです。'],
+      ['color-sequence','Color Sequence','🎨','知識認証','色の順番を記憶する方式','色の順序を使った記憶認証のシミュレーションです。'],
+      ['shape-sequence','Shape Sequence','🔷','知識認証','図形の順番を記憶する方式','図形の順序を使った認証のシミュレーションです。'],
+      ['spatial-memory','Spatial Memory','🧭','知識認証','位置を記憶する方式','空間記憶を使った認証のシミュレーションです。'],
+      ['typing-dynamics','Typing Dynamics','⌨️','行動認証','キー入力のタイミングを分析','入力時間の特徴を扱う学習用シミュレーションです。'],
+      ['mouse-dynamics','Mouse Dynamics','🖱️','行動認証','マウス操作の特徴を分析','マウス操作を使う行動認証のシミュレーションです。'],
+      ['touch-dynamics','Touch Dynamics','👆','行動認証','タッチ操作の特徴を分析','タッチ操作を使う行動認証のシミュレーションです。'],
+      ['gesture','Gesture Lab','🖐️','行動認証','ジェスチャーを使う方式','ジェスチャー認証のシミュレーションです。'],
+      ['signature','Signature Dynamics','✍️','行動認証','署名の動きを扱う方式','署名の筆跡・時間情報を扱うシミュレーションです。'],
+      ['hotp','HOTP Lab','🔢','所持認証','カウンターベースOTP','HOTPの仕組みを学ぶシミュレーションです。'],
+      ['email-otp','Email OTP','✉️','所持認証','メールでコードを受け取る方式','メール送信サービス未接続のためシミュレーションです。'],
+      ['sms-otp','SMS OTP','📱','所持認証','SMSでコードを受け取る方式','SMS事業者未接続のためシミュレーションです。'],
+      ['qr-auth','QR Authentication','▦','所持認証','QRコードを使う方式','QR認証の流れを学ぶシミュレーションです。'],
+      ['push-auth','Push Authentication','🔔','所持認証','プッシュ通知で承認する方式','通知基盤未接続のためシミュレーションです。'],
+      ['face','Face Authentication','🙂','生体認証','顔認証の仕組み','端末の生体データにはアクセスせず、方式の説明と模擬実験を行います。'],
+      ['voice','Voice Authentication','🎙️','生体認証','声の特徴を使う方式','録音データを保存しない前提の学習用シミュレーションです。'],
+      ['fingerprint','Fingerprint','☝️','生体認証','指紋認証の仕組み','端末内の認証器を利用する方式です。生指紋データは取得しません。'],
+      ['iris','Iris Recognition','👁️','生体認証','虹彩認証の仕組み','専用センサーが必要なためシミュレーションです。'],
+      ['public-key','Public Key Lab','🗝️','暗号認証','公開鍵暗号の仕組み','Web Crypto APIを使う暗号学習アプリの拡張枠です。'],
+      ['challenge','Challenge Response','🔁','暗号認証','チャレンジレスポンス方式','チャレンジレスポンスの流れを学ぶシミュレーションです。'],
+      ['certificate','Certificate Lab','📜','暗号認証','証明書認証の仕組み','証明書と信頼チェーンの学習用シミュレーションです。'],
+      ['device','Device Recognition','💻','コンテキスト認証','端末状態を使う方式','プライバシーに配慮したブラウザ機能の範囲で扱います。'],
+      ['location','Location Auth','📍','コンテキスト認証','位置情報を条件にする方式','明示的な許可がある場合だけ位置情報APIを試します。'],
+      ['risk','Risk-based Auth','🛡️','適応型認証','リスクに応じて追加確認','架空データを使ったリスク評価のシミュレーションです。'],
+      ['mfa','MFA Flow Lab','🧬','複合認証','複数要素を組み合わせる方式','認証要素の組み合わせを設計するシミュレーションです。']
+    ].map(([id,name,icon,category,description,note])=>({id,name,icon,category,description,kind:'placeholder',note}))
+  ];
+
+  const $ = (s,root=document) => root.querySelector(s);
+  const desktopIcons = $('#desktopIcons');
+  const startGrid = $('#startGrid');
+  const startMenu = $('#startMenu');
+  const startButton = $('#startButton');
+  const taskbarApps = $('#taskbarApps');
+  const windowLayer = $('#windowLayer');
+  const toast = $('#toast');
+  let zIndex = 10;
+  let activeId = null;
+  let toastTimer = null;
+  const windows = new Map();
+  const appState = new Map();
+  const clientId = (() => {
+    let id = '';
+    try { id = localStorage.getItem('authlab.clientId') || ''; } catch (_) {}
+    if (!/^[a-f0-9-]{36}$/i.test(id)) {
+      id = (crypto.randomUUID ? crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
+      try { localStorage.setItem('authlab.clientId', id); } catch (_) {}
+    }
+    return id;
+  })();
+  let rhythmTimes = [];
+  let imageSelection = [];
+  let otpTimer = null;
+
+  function safeRead(key, fallback) {
+    try { const value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; }
+    catch (_) { return fallback; }
+  }
+  function safeWrite(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+    catch (_) { showToast('保存できませんでした。ブラウザの保存設定を確認してください。'); return false; }
+  }
+  function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function showToast(message) {
+    toast.textContent = message; toast.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.hidden = true, 2600);
+  }
+  function getApp(id) { return APP_DEFS.find(app => app.id === id); }
+
+  function renderAppLists(filter='') {
+    const q = filter.trim().toLowerCase();
+    const apps = APP_DEFS.filter(app => (app.name + ' ' + app.description + ' ' + app.category).toLowerCase().includes(q));
+    desktopIcons.innerHTML = APP_DEFS.filter(a => ['password','pin','pattern','image','rhythm','otp','passkey','builder','compare'].includes(a.id)).map(app => `
+      <button class="desktop-app" data-open="${app.id}" aria-label="${escapeHTML(app.name)}を開く">
+        <span class="app-icon">${app.icon}</span><span class="app-label">${escapeHTML(app.name)}</span>
+      </button>`).join('');
+    startGrid.innerHTML = apps.map(app => `
+      <button class="start-app" data-open="${app.id}">
+        <span class="app-icon">${app.icon}</span><span>${escapeHTML(app.name)}</span>
+      </button>`).join('');
+    if (!apps.length) startGrid.innerHTML = '<p class="muted small">一致するアプリがありません。</p>';
+  }
+
+  function baseContent(app) {
+    const saved = appState.get(app.id);
+    if (app.kind === 'password') return passwordContent(saved);
+    if (app.kind === 'pin') return pinContent(saved);
+    if (app.kind === 'pattern') return patternContent(saved);
+    if (app.kind === 'image') return imageContent(saved);
+    if (app.kind === 'rhythm') return rhythmContent(saved);
+    if (app.kind === 'otp') return otpContent(saved);
+    if (app.kind === 'builder') return builderContent();
+    if (app.kind === 'compare') return compareContent();
+    if (app.kind === 'settings') return settingsContent();
+    if (app.kind === 'api') return apiContent();
+    if (app.kind === 'placeholder') return placeholderContent(app);
+    return '<p>このアプリは準備中です。</p>';
+  }
+
+  function passwordContent(saved) {
+    return `<h2>🔑 Password Lab</h2><p>架空のアカウントを作成し、ブラウザ内だけで照合する学習用デモです。</p>
+      <div class="status warn">学習専用。実際に使っているパスワードや個人情報を入力しないでください。</div>
+      <div class="field"><label for="pwUser">デモユーザー名</label><input id="pwUser" autocomplete="off" value="${escapeHTML(saved?.username || '')}" placeholder="例: test-user"></div>
+      <div class="field"><label for="pwSecret">デモ用パスワード</label><input id="pwSecret" type="password" autocomplete="new-password" placeholder="実験用の値を入力"></div>
+      <div class="button-row"><button class="primary-btn" data-action="password-save">デモ情報を登録</button><button class="secondary-btn" data-action="password-check">入力を照合</button><button class="secondary-btn" data-action="password-clear">削除</button></div>
+      <div class="status" data-role="status">登録した値はこのブラウザのローカル領域に保存されます。実サービスには使用しないでください。</div>`;
+  }
+  function pinContent(saved) {
+    return `<h2>🔢 PIN Lab</h2><p>桁数を決めてPINを登録し、入力値を照合します。</p>
+      <div class="status warn">このデモはセキュリティ保護を目的としていません。実際のPINは使わないでください。</div>
+      <div class="field"><label for="pinLength">PINの桁数</label><select id="pinLength">${[4,5,6,7,8].map(n=>`<option value="${n}" ${saved?.length===n?'selected':''}>${n}桁</option>`).join('')}</select></div>
+      <div class="field"><label for="pinSecret">登録するデモPIN</label><input id="pinSecret" type="password" inputmode="numeric" autocomplete="off" placeholder="数字のみ"></div>
+      <div class="button-row"><button class="primary-btn" data-action="pin-save">PINを登録</button><button class="secondary-btn" data-action="pin-check">PINを照合</button><button class="secondary-btn" data-action="pin-clear">削除</button></div>
+      <div class="status" data-role="status">PINはブラウザ内の学習用データとして保存されます。</div>`;
+  }
+  function patternContent(saved) {
+    return `<h2>🔵 Pattern Lab</h2><p>9つの点を順番にタップして、パターンを登録・照合します。</p>
+      <div class="status warn">実際の端末ロックではありません。画面に描いた順序をローカルで比較するだけのデモです。</div>
+      <div class="pattern-grid" id="patternGrid">${Array.from({length:9},(_,i)=>`<button class="pattern-dot" data-dot="${i}" aria-label="点 ${i+1}">${i+1}</button>`).join('')}</div>
+      <div class="muted small" id="patternCurrent">選択した点: なし</div>
+      <div class="button-row"><button class="primary-btn" data-action="pattern-save">パターンを登録</button><button class="secondary-btn" data-action="pattern-check">照合</button><button class="secondary-btn" data-action="pattern-reset">選択をリセット</button><button class="secondary-btn" data-action="pattern-clear">登録を削除</button></div>
+      <div class="status" data-role="status">${saved?.pattern ? 'パターンが登録済みです。' : 'まだパターンは登録されていません。'}</div>`;
+  }
+
+  function imageContent(saved) {
+    const tiles = ['🍎','🌙','⭐','🐈','🌈','🚀','🍀','🎧','🔥'];
+    return `<h2>🖼️ Image Lock</h2><p>9つの絵文字タイルから順番を選ぶ、画像型ロックのデモです。</p>
+      <div class="status warn">実際の画像認証や本人確認ではありません。選択順序をブラウザ内で比較するだけです。</div>
+      <div class="card-grid" id="imageTiles" style="grid-template-columns:repeat(3,minmax(0,1fr));max-width:300px;margin:16px auto">
+        ${tiles.map((t,i)=>`<button class="secondary-btn" data-image-tile="${i}" style="font-size:27px;min-height:70px">${t}</button>`).join('')}
+      </div>
+      <div class="muted small" id="imageCurrent">選択した順番: なし</div>
+      <div class="button-row"><button class="primary-btn" data-action="image-save">選択を登録</button><button class="secondary-btn" data-action="image-check">照合</button><button class="secondary-btn" data-action="image-reset">リセット</button><button class="secondary-btn" data-action="image-clear">削除</button></div>
+      <div class="status" data-role="status">${saved?.sequence ? '登録済みです。' : '3タイル以上を選んで登録してください。'}</div>`;
+  }
+  function rhythmContent(saved) {
+    return `<h2>🎵 Rhythm Lock</h2><p>「タップ」ボタンを何度か押し、押す間隔をリズムとして登録・照合します。</p>
+      <div class="status warn">タイミングのばらつきがあるため、実用的な本人確認には向きません。実験用です。</div>
+      <div style="display:grid;place-items:center;padding:16px"><button class="primary-btn" data-rhythm-tap style="width:150px;height:100px;border-radius:24px;font-size:20px">● TAP</button></div>
+      <div class="muted small" id="rhythmCurrent">記録したタップ: 0</div>
+      <div class="button-row"><button class="primary-btn" data-action="rhythm-save">リズムを登録</button><button class="secondary-btn" data-action="rhythm-check">照合</button><button class="secondary-btn" data-action="rhythm-reset">記録をリセット</button><button class="secondary-btn" data-action="rhythm-clear">登録を削除</button></div>
+      <div class="status" data-role="status">${saved?.intervals ? 'リズムが登録済みです。' : '6回以上タップしてから登録してください。'}</div>`;
+  }
+  function otpContent(saved) {
+    return `<h2>⏱️ OTP Lab</h2><p>時間ベースのワンタイムコード（TOTP）の仕組みをブラウザ内で体験します。</p>
+      <div class="status warn">学習用です。表示する秘密鍵を本番アカウントや実際の認証アプリに使わないでください。</div>
+      <div class="field"><label>デモ秘密鍵（Base32）</label><input id="otpSecret" readonly value="${escapeHTML(saved?.secret || '')}" placeholder="まだ生成されていません"></div>
+      <div class="field"><label>現在のデモコード</label><div id="otpCode" style="font-size:30px;font-weight:750;letter-spacing:7px;padding:12px 0">------</div><div class="muted small" id="otpCountdown">コード未生成</div></div>
+      <div class="button-row"><button class="primary-btn" data-action="otp-generate">秘密鍵を生成</button><button class="secondary-btn" data-action="otp-refresh">コード更新</button></div>
+      <div class="field"><label for="otpInput">照合する6桁コード</label><input id="otpInput" inputmode="numeric" maxlength="6" placeholder="000000"></div>
+      <div class="button-row"><button class="primary-btn" data-action="otp-check">コードを照合</button><button class="secondary-btn" data-action="otp-clear">秘密鍵を削除</button></div>
+      <div class="status" data-role="status">コードは30秒ごとに変わるTOTP形式です。秘密鍵はこのブラウザ内にのみ保存されます。</div>`;
+  }
+
+  function apiContent() {
+    return `<h2>🧩 API Manager</h2><p>このブラウザで利用できる認証関連APIと権限を確認します。</p>
+      <div class="status warn">この画面は機能検出と権限テスト用です。生体情報そのものは取得・保存しません。</div>
+      <div id="apiResults" class="card-grid"><div class="mini-card">診断を実行してください。</div></div>
+      <div class="button-row"><button class="primary-btn" data-action="api-check">対応状況を診断</button><button class="secondary-btn" data-action="api-camera">カメラ許可を試す</button><button class="secondary-btn" data-action="api-mic">マイク許可を試す</button><button class="secondary-btn" data-action="api-location">位置情報許可を試す</button></div>
+      <div class="status" data-role="status">Passkeyの登録・検証には別途RPサーバーが必要です。ここでは対応状況のみ確認します。</div>`;
+  }
+  function apiResult(label, value, detail='') { return `<div class="mini-card"><strong>${escapeHTML(label)}</strong><span>${escapeHTML(value)}</span>${detail?`<span class="muted small">${escapeHTML(detail)}</span>`:''}</div>`; }
+  function apiDiagnostics(winEl) {
+    const secure=window.isSecureContext;
+    const rows=[
+      apiResult('HTTPS / Secure Context',secure?'利用可能':'利用不可','GitHub Pagesは通常HTTPSで公開されます。'),
+      apiResult('WebAuthn',!!(navigator.credentials && window.PublicKeyCredential)?'APIあり':'非対応','APIの存在確認のみ。登録にはサーバー発行チャレンジが必要。'),
+      apiResult('Web Crypto',!!(crypto.subtle && crypto.getRandomValues)?'利用可能':'利用不可','暗号処理・TOTP等に利用。'),
+      apiResult('Camera / Microphone',!!navigator.mediaDevices?.getUserMedia?'APIあり':'非対応','実際の利用にはユーザー許可が必要。'),
+      apiResult('Geolocation',!!navigator.geolocation?'APIあり':'非対応','位置情報は明示的な許可が必要。'),
+      apiResult('Web NFC', 'NDEFReader' in window?'APIあり':'この環境では非対応','端末・ブラウザ依存。'),
+      apiResult('Web Bluetooth','bluetooth' in navigator?'APIあり':'この環境では非対応','端末・ブラウザ依存。'),
+      apiResult('WebUSB','usb' in navigator?'APIあり':'この環境では非対応','端末・ブラウザ依存。')
+    ];
+    $('#apiResults',winEl).innerHTML=rows.join('');
+    setStatus(winEl,'ブラウザAPIの機能検出が完了しました。','good');
+  }
+  function placeholderContent(app) {
+    return `<h2>${app.icon} ${escapeHTML(app.name)}</h2><p>${escapeHTML(app.description)}</p>
+      <div class="status warn">${escapeHTML(app.note || 'このアプリは準備中です。')}</div>
+      <h3>予定している機能</h3><div class="card-grid">
+      <div class="mini-card"><div class="big">⚙️</div><strong>セットアップ</strong><span>自分の実験条件を設定</span></div>
+      <div class="mini-card"><div class="big">🧪</div><strong>シミュレーション</strong><span>架空のデータで動作を確認</span></div>
+      <div class="mini-card"><div class="big">📘</div><strong>学習ノート</strong><span>仕組みと安全性を理解</span></div></div>
+      <div class="button-row"><button class="secondary-btn" data-action="coming-soon">開発予定を確認</button></div>`;
+  }
+  function builderContent() {
+    return `<h2>🧪 Auth Builder</h2><p>将来、ここから自分用の認証実験アプリをセットアップできるようにします。</p>
+      <div class="field"><label for="customName">実験名</label><input id="customName" maxlength="40" placeholder="例: Color Sequence"></div>
+      <div class="field"><label for="customType">方式</label><select id="customType"><option value="sequence">記号・順序</option><option value="color">色の順序</option><option value="logic">ロジック問題</option><option value="rhythm">リズム</option></select></div>
+      <div class="field"><label for="customNote">メモ</label><input id="customNote" maxlength="160" placeholder="どんな認証か"></div>
+      <button class="primary-btn" data-action="builder-save">設計メモを保存</button>
+      <div class="status" data-role="status">ここでは設計メモのみ保存します。任意コードの実行や、OSへのスクリプト注入は行いません。</div>
+      <h3>保存した設計メモ</h3><div id="customList">${renderCustomList()}</div>`;
+  }
+  function renderCustomList() {
+    const items = safeRead('authlab.customDesigns', []);
+    if (!items.length) return '<p class="muted small">まだ設計メモはありません。</p>';
+    return items.map((item,i)=>`<div class="mini-card" style="margin:8px 0"><strong>${escapeHTML(item.name)}</strong><span>${escapeHTML(item.type)} · ${escapeHTML(item.note || 'メモなし')}</span><button class="secondary-btn" style="margin-top:8px" data-action="builder-delete" data-index="${i}">削除</button></div>`).join('');
+  }
+  function compareContent() {
+    const rows = [
+      ['パスワード','知識','サービス側の実装次第','フィッシングや使い回しに注意'],
+      ['PIN','知識','単独では候補数が限られやすい','端末側の試行制限などが重要'],
+      ['パターン','知識・操作','見られたり推測されたりする可能性','入力の観察や再利用に注意'],
+      ['OTP','所持要素など','コードの盗難やリアルタイム中継に注意','方式や実装によって性質が異なる'],
+      ['パスキー','公開鍵・端末操作','適切なWebAuthn実装が必要','フィッシング耐性を持つ設計が可能']
+    ];
+    return `<h2>📊 Auth Compare</h2><p>代表的な方式の特徴を学習用に比較します。実際の安全性は実装や運用条件によって変わります。</p>
+      <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${['方式','要素','注意点','メモ'].map(x=>`<th style="text-align:left;padding:10px;border-bottom:1px solid var(--line)">${x}</th>`).join('')}</tr></thead><tbody>
+      ${rows.map(row=>`<tr>${row.map(cell=>`<td style="vertical-align:top;padding:10px;border-bottom:1px solid var(--line);line-height:1.5">${escapeHTML(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+      <div class="status">比較表は概略です。「強い・弱い」は方式名だけでは決まらず、実装、端末、サーバー、利用状況を含めて評価します。</div>`;
+  }
+  function settingsContent() {
+    const prefs = safeRead('authlab.preferences',{wallpaper:'aurora'});
+    return `<h2>⚙️ Settings</h2><p>Auth Lab OSの表示と、このブラウザに保存した学習データを管理します。</p>
+      <div class="field"><label for="wallpaper">デスクトップテーマ</label><select id="wallpaper"><option value="aurora" ${prefs.wallpaper==='aurora'?'selected':''}>Aurora / 標準</option><option value="midnight" ${prefs.wallpaper==='midnight'?'selected':''}>Midnight / 暗め</option><option value="violet" ${prefs.wallpaper==='violet'?'selected':''}>Violet / 紫</option></select></div>
+      <div class="button-row"><button class="primary-btn" data-action="settings-save">設定を保存</button><button class="secondary-btn" data-action="cloud-load">GASから読み込む</button><button class="secondary-btn" data-action="cloud-save">GASへ保存</button><button class="secondary-btn" data-action="settings-export">設定をエクスポート</button><button class="secondary-btn" data-action="settings-clear">学習データを初期化</button></div><div class="status" id="cloudStatus" data-role="cloud-status">GitHub Pages版ではローカル保存を利用します。Google Sheets同期は別途連携設定が必要です。</div>
+      <div class="status warn">初期化すると、このサイトがブラウザ内に保存した学習用設定が削除されます。元に戻せません。</div>
+      <h3>保存方式</h3><p class="small">表示設定と設計メモはGAS経由でGoogleスプレッドシートに同期できます。パスワード・PIN・パターン・OTP秘密鍵は同期しません。GASのデプロイ先にアクセスできる利用者は、学習用データを操作できるため、実際の認証情報を保存しないでください。</p>`;
+  }
+
+  function createWindow(appId) {
+    const app = getApp(appId);
+    if (!app) return;
+    if (windows.has(appId)) {
+      const win = windows.get(appId);
+      win.el.classList.remove('minimized');
+      focusWindow(appId); closeStartMenu(); return;
+    }
+    const el = document.createElement('section');
+    el.className = 'app-window';
+    el.dataset.window = appId;
+    el.style.zIndex = String(++zIndex);
+    el.innerHTML = `<div class="window-titlebar" data-drag-handle>
+      <span class="window-app-icon">${app.icon}</span><span class="window-title">${escapeHTML(app.name)}</span>
+      <div class="window-controls">
+        <button type="button" data-window-action="minimize" aria-label="最小化" title="最小化">−</button>
+        <button type="button" data-window-action="maximize" aria-label="最大化" title="最大化">□</button>
+        <button type="button" class="close" data-window-action="close" aria-label="閉じる" title="閉じる">×</button>
+      </div></div><div class="window-content">${baseContent(app)}</div>`;
+    windowLayer.appendChild(el);
+    windows.set(appId,{el,appId,maximized:false,restore:null});
+    attachWindowEvents(el,appId);
+    focusWindow(appId);
+    renderTaskbar();
+    closeStartMenu();
+    if (app.kind === 'pattern') setupPattern(el, appId);
+    if (app.kind === 'image') {
+      imageSelection=[];
+      const saved=appState.get(appId)||safeRead('authlab.demo.image',null);
+      if(saved) appState.set(appId,saved);
+      el.querySelectorAll('[data-image-tile]').forEach(btn=>btn.addEventListener('click',()=>{}));
+    }
+    if (app.kind === 'rhythm') {
+      rhythmTimes=[];
+      const saved=appState.get(appId)||safeRead('authlab.demo.rhythm',null);
+      if(saved) appState.set(appId,saved);
+    }
+    if (app.kind === 'otp') {
+      refreshOtp(el);
+      if(otpTimer) clearInterval(otpTimer);
+      otpTimer=setInterval(()=>{const current=windows.get('otp');if(current&&!current.el.classList.contains('minimized'))refreshOtp(current.el);},1000);
+    }
+  }
+
+  function focusWindow(appId) {
+    const win = windows.get(appId);
+    if (!win) return;
+    activeId = appId;
+    win.el.style.zIndex = String(++zIndex);
+    renderTaskbar();
+  }
+  function closeWindow(appId) {
+    const win = windows.get(appId);
+    if (!win) return;
+    win.el.remove(); windows.delete(appId);
+    if (activeId === appId) activeId = [...windows.keys()].pop() || null;
+    renderTaskbar();
+  }
+  function minimizeWindow(appId) {
+    const win = windows.get(appId); if (!win) return;
+    win.el.classList.add('minimized');
+    if (activeId === appId) activeId = [...windows.keys()].filter(id => !windows.get(id).el.classList.contains('minimized')).pop() || null;
+    renderTaskbar();
+  }
+  function maximizeWindow(appId) {
+    const win = windows.get(appId); if (!win) return;
+    if (!win.maximized) {
+      win.restore = {left:win.el.style.left,top:win.el.style.top,width:win.el.style.width,height:win.el.style.height};
+      win.el.classList.add('maximized'); win.maximized = true;
+    } else {
+      win.el.classList.remove('maximized'); win.maximized = false;
+      if (win.restore) Object.assign(win.el.style,win.restore);
+    }
+    focusWindow(appId);
+  }
+  function renderTaskbar() {
+    taskbarApps.innerHTML = [...windows.entries()].map(([id,win]) => {
+      const app = getApp(id);
+      const minimized = win.el.classList.contains('minimized');
+      return `<button class="task-app running ${activeId===id && !minimized?'current':''}" data-task="${id}" title="${escapeHTML(app.name)}"><span>${app.icon}</span><span>${escapeHTML(app.name)}</span></button>`;
+    }).join('');
+  }
+  function attachWindowEvents(el,appId) {
+    el.addEventListener('pointerdown',()=>focusWindow(appId));
+    el.querySelectorAll('[data-window-action]').forEach(btn=>btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const action=btn.dataset.windowAction;
+      if(action==='close') closeWindow(appId);
+      if(action==='minimize') minimizeWindow(appId);
+      if(action==='maximize') maximizeWindow(appId);
+    }));
+    const bar=el.querySelector('[data-drag-handle]');
+    let drag=null;
+    bar.addEventListener('pointerdown',e=>{
+      if(e.target.closest('button') || windows.get(appId).maximized || window.matchMedia('(max-width: 600px)').matches) return;
+      drag={x:e.clientX,y:e.clientY,left:el.offsetLeft,top:el.offsetTop};
+      bar.setPointerCapture?.(e.pointerId);
+    });
+    bar.addEventListener('pointermove',e=>{
+      if(!drag) return;
+      const left=Math.max(0,Math.min(window.innerWidth-el.offsetWidth,drag.left+e.clientX-drag.x));
+      const top=Math.max(0,Math.min(window.innerHeight-100,drag.top+e.clientY-drag.y));
+      el.style.left=left+'px';el.style.top=top+'px';
+    });
+    const end=()=>{drag=null};
+    bar.addEventListener('pointerup',end);bar.addEventListener('pointercancel',end);
+  }
+
+  function closeStartMenu() { startMenu.hidden=true; startButton.classList.remove('active'); startButton.setAttribute('aria-expanded','false'); }
+  function toggleStartMenu() {
+    startMenu.hidden=!startMenu.hidden;
+    startButton.classList.toggle('active',!startMenu.hidden);
+    startButton.setAttribute('aria-expanded',String(!startMenu.hidden));
+    if(!startMenu.hidden) { $('#appSearch').value=''; renderAppLists(''); $('#appSearch').focus(); }
+  }
+
+  function setStatus(el,message,type='') {
+    const box=el.querySelector('[data-role="status"]');
+    if(!box) { showToast(message); return; }
+    box.textContent=message; box.className='status'+(type?' '+type:'');
+  }
+
+  function base32Encode(bytes) {
+    const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits=0,value=0,out='';
+    for(const b of bytes){value=(value<<8)|b;bits+=8;while(bits>=5){out+=alphabet[(value>>>(bits-5))&31];bits-=5;}}
+    if(bits>0) out+=alphabet[(value<<(5-bits))&31];
+    return out;
+  }
+  function base32Decode(s) {
+    const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits=0,value=0,out=[];
+    for(const ch of s.replace(/=+$/,'').toUpperCase()){
+      const n=alphabet.indexOf(ch);if(n<0)continue;
+      value=(value<<5)|n;bits+=5;
+      if(bits>=8){out.push((value>>>(bits-8))&255);bits-=8;}
+    }
+    return new Uint8Array(out);
+  }
+  async function totpCode(secret, timeMs=Date.now()) {
+    const keyBytes=base32Decode(secret);
+    const counter=Math.floor(timeMs/30000);
+    const msg=new Uint8Array(8);
+    let n=counter;
+    for(let i=7;i>=0;i--){msg[i]=n&255;n=Math.floor(n/256);}
+    const key=await crypto.subtle.importKey('raw',keyBytes,{name:'HMAC',hash:'SHA-1'},false,['sign']);
+    const mac=new Uint8Array(await crypto.subtle.sign('HMAC',key,msg));
+    const offset=mac[mac.length-1]&15;
+    const binary=((mac[offset]&127)<<24)|((mac[offset+1]&255)<<16)|((mac[offset+2]&255)<<8)|(mac[offset+3]&255);
+    return String(binary%1000000).padStart(6,'0');
+  }
+  async function refreshOtp(winEl) {
+    const saved=safeRead('authlab.demo.otp',null);
+    if(!saved?.secret){$('#otpCode',winEl).textContent='------';$('#otpCountdown',winEl).textContent='秘密鍵を生成してください';return;}
+    try {
+      $('#otpSecret',winEl).value=saved.secret;
+      $('#otpCode',winEl).textContent=await totpCode(saved.secret);
+      const remaining=30-Math.floor((Date.now()/1000)%30);
+      $('#otpCountdown',winEl).textContent=`次の更新まで約${remaining}秒`;
+    } catch(e) { setStatus(winEl,'このブラウザでは暗号APIを利用できません。HTTPS環境で開いているか確認してください。','warn'); }
+  }
+  function cloudCall(method, payload, winEl) {
+    const status = winEl.querySelector('[data-role="cloud-status"]');
+    const fallback = msg => { if(status){status.textContent=msg;status.className='status warn';} else showToast(msg); };
+    if(!window.google?.script?.run) {
+      fallback('GitHub Pages版ではGAS同期は未接続です。ローカル保存は利用できます。Google Sheets同期は別途安全な連携経路を設定してください。');
+      return;
+    }
+    if(status){status.textContent='GASと通信中…';status.className='status';}
+    const runner=google.script.run
+      .withSuccessHandler(result=>{
+        if(method==='saveCloudData') {
+          if(status){status.textContent='Googleスプレッドシートへ保存しました。'+(result.spreadsheetUrl?' 保存先を開く: '+result.spreadsheetUrl:'');status.className='status good';}
+        } else {
+          if(result.preferences) safeWrite('authlab.preferences',result.preferences);
+          if(Array.isArray(result.customDesigns)) safeWrite('authlab.customDesigns',result.customDesigns);
+          applyTheme();
+          if(status){status.textContent='GASから設定と設計メモを読み込みました。'+(result.spreadsheetUrl?' 保存先: '+result.spreadsheetUrl:'');status.className='status good';}
+          const list=winEl.querySelector('#customList');if(list)list.innerHTML=renderCustomList();
+        }
+      })
+      .withFailureHandler(err=>fallback('GAS通信エラー: '+(err?.message||String(err))));
+    if(method==='saveCloudData') runner.saveCloudData(clientId,payload);
+    else runner.loadCloudData(clientId);
+  }
+
+  async function handleAction(button) {
+    const action=button.dataset.action;
+    const winEl=button.closest('.app-window');
+    const appId=winEl?.dataset.window;
+    const app=appId?getApp(appId):null;
+    if(!app) return;
+
+    if(action==='password-save') {
+      const username=winEl.querySelector('#pwUser').value.trim();
+      const secret=winEl.querySelector('#pwSecret').value;
+      if(!username||!secret) return setStatus(winEl,'ユーザー名とデモ用パスワードを入力してください。','warn');
+      appState.set(appId,{username,secret});
+      safeWrite('authlab.demo.password',{username,secret});
+      winEl.querySelector('#pwSecret').value='';
+      setStatus(winEl,'デモ情報を登録しました。ローカル保存のみで、実サービスには使えません。','good');
+    } else if(action==='password-check') {
+      const saved=appState.get(appId)||safeRead('authlab.demo.password',null);
+      const username=winEl.querySelector('#pwUser').value.trim();
+      const secret=winEl.querySelector('#pwSecret').value;
+      setStatus(winEl,saved&&username===saved.username&&secret===saved.secret?'一致しました（学習用デモ）。':'一致しません。登録内容を確認してください。',saved&&username===saved.username&&secret===saved.secret?'good':'warn');
+    } else if(action==='password-clear') {
+      appState.delete(appId); try{localStorage.removeItem('authlab.demo.password')}catch(_){}
+      winEl.querySelector('#pwSecret').value='';setStatus(winEl,'デモ情報を削除しました。','good');
+    } else if(action==='pin-save') {
+      const length=Number(winEl.querySelector('#pinLength').value),pin=winEl.querySelector('#pinSecret').value;
+      if(!new RegExp('^\\d{'+length+'}$').test(pin)) return setStatus(winEl,`PINは数字${length}桁で入力してください。`,'warn');
+      appState.set(appId,{length,pin});safeWrite('authlab.demo.pin',{length,pin});
+      winEl.querySelector('#pinSecret').value='';setStatus(winEl,'PINを登録しました。学習用データとしてのみ保存されています。','good');
+    } else if(action==='pin-check') {
+      const saved=appState.get(appId)||safeRead('authlab.demo.pin',null),pin=winEl.querySelector('#pinSecret').value;
+      const ok=!!saved&&pin===saved.pin;
+      setStatus(winEl,ok?'一致しました（学習用デモ）。':'一致しません。',ok?'good':'warn');
+    } else if(action==='pin-clear') {
+      appState.delete(appId);try{localStorage.removeItem('authlab.demo.pin')}catch(_){}
+      winEl.querySelector('#pinSecret').value='';setStatus(winEl,'PINを削除しました。','good');
+    } else if(action==='pattern-save') {
+      const selected=winEl._selectedDots||[];
+      if(selected.length<4) return setStatus(winEl,'登録には4点以上を選択してください。','warn');
+      const pattern=selected.join('-');appState.set(appId,{pattern});safeWrite('authlab.demo.pattern',{pattern});
+      setStatus(winEl,'パターンを登録しました。','good');
+    } else if(action==='pattern-check') {
+      const selected=(winEl._selectedDots||[]).join('-'),saved=appState.get(appId)||safeRead('authlab.demo.pattern',null);
+      const ok=!!saved&&selected===saved.pattern;
+      setStatus(winEl,ok?'一致しました（学習用デモ）。':'一致しません。',ok?'good':'warn');
+    } else if(action==='pattern-reset') {
+      winEl._selectedDots=[];winEl.querySelectorAll('.pattern-dot').forEach(d=>d.classList.remove('selected'));
+      $('#patternCurrent',winEl).textContent='選択した点: なし';setStatus(winEl,'選択をリセットしました。');
+    } else if(action==='pattern-clear') {
+      appState.delete(appId);try{localStorage.removeItem('authlab.demo.pattern')}catch(_){}
+      winEl._selectedDots=[];winEl.querySelectorAll('.pattern-dot').forEach(d=>d.classList.remove('selected'));
+      $('#patternCurrent',winEl).textContent='選択した点: なし';setStatus(winEl,'登録パターンを削除しました。','good');
+
+    } else if(action==='image-save') {
+      if(imageSelection.length<3) return setStatus(winEl,'3タイル以上を選択してください。','warn');
+      const sequence=imageSelection.join('-');appState.set(appId,{sequence});safeWrite('authlab.demo.image',{sequence});
+      setStatus(winEl,'画像型ロックを登録しました。','good');
+    } else if(action==='image-check') {
+      const saved=appState.get(appId)||safeRead('authlab.demo.image',null);
+      const ok=!!saved&&imageSelection.join('-')===saved.sequence;
+      setStatus(winEl,ok?'一致しました（学習用デモ）。':'一致しません。',ok?'good':'warn');
+    } else if(action==='image-reset') {
+      imageSelection=[];winEl.querySelectorAll('[data-image-tile]').forEach(b=>b.style.outline='');
+      $('#imageCurrent',winEl).textContent='選択した順番: なし';setStatus(winEl,'選択をリセットしました。');
+    } else if(action==='image-clear') {
+      appState.delete(appId);try{localStorage.removeItem('authlab.demo.image')}catch(_){}
+      imageSelection=[];winEl.querySelectorAll('[data-image-tile]').forEach(b=>b.style.outline='');
+      $('#imageCurrent',winEl).textContent='選択した順番: なし';setStatus(winEl,'登録を削除しました。','good');
+    } else if(action==='rhythm-save') {
+      if(rhythmTimes.length<6) return setStatus(winEl,'6回以上タップしてから登録してください。','warn');
+      const intervals=rhythmTimes.slice(1).map((t,i)=>t-rhythmTimes[i]);
+      appState.set(appId,{intervals});safeWrite('authlab.demo.rhythm',{intervals});
+      setStatus(winEl,'リズムを登録しました。','good');
+    } else if(action==='rhythm-check') {
+      const saved=appState.get(appId)||safeRead('authlab.demo.rhythm',null);
+      if(!saved?.intervals) return setStatus(winEl,'先にリズムを登録してください。','warn');
+      if(rhythmTimes.length<saved.intervals.length+1) return setStatus(winEl,'登録時と同じ回数以上タップしてください。','warn');
+      const actual=rhythmTimes.slice(1,saved.intervals.length+1).map((t,i)=>t-rhythmTimes[i]);
+      const ok=saved.intervals.every((v,i)=>Math.abs(v-actual[i])<=Math.max(180,v*0.3));
+      setStatus(winEl,ok?'リズムがおおむね一致しました（学習用デモ）。':'リズムが一致しません。タイミングの許容差は学習用の簡易判定です。',ok?'good':'warn');
+    } else if(action==='rhythm-reset') {
+      rhythmTimes=[];$('#rhythmCurrent',winEl).textContent='記録したタップ: 0';setStatus(winEl,'タップ記録をリセットしました。');
+    } else if(action==='rhythm-clear') {
+      appState.delete(appId);try{localStorage.removeItem('authlab.demo.rhythm')}catch(_){}
+      rhythmTimes=[];$('#rhythmCurrent',winEl).textContent='記録したタップ: 0';setStatus(winEl,'登録したリズムを削除しました。','good');
+    } else if(action==='otp-generate') {
+      const bytes=crypto.getRandomValues(new Uint8Array(20)),secret=base32Encode(bytes);
+      safeWrite('authlab.demo.otp',{secret});await refreshOtp(winEl);
+      setStatus(winEl,'デモ用TOTP秘密鍵を生成しました。外部サービスには登録しないでください。','good');
+    } else if(action==='otp-refresh') {
+      await refreshOtp(winEl);
+    } else if(action==='otp-check') {
+      const saved=safeRead('authlab.demo.otp',null),input=winEl.querySelector('#otpInput').value.trim();
+      if(!saved?.secret) return setStatus(winEl,'先に秘密鍵を生成してください。','warn');
+      const now=Date.now(),codes=await Promise.all([-30000,0,30000].map(delta=>totpCode(saved.secret,now+delta)));
+      const ok=codes.includes(input)&&/^\d{6}$/.test(input);
+      setStatus(winEl,ok?'コードが一致しました（TOTP学習用デモ）。':'一致しません。現在のコードを確認してください。',ok?'good':'warn');
+    } else if(action==='otp-clear') {
+      try{localStorage.removeItem('authlab.demo.otp')}catch(_){}
+      winEl.querySelector('#otpSecret').value='';winEl.querySelector('#otpInput').value='';
+      $('#otpCode',winEl).textContent='------';$('#otpCountdown',winEl).textContent='コード未生成';
+      setStatus(winEl,'デモ秘密鍵を削除しました。','good');
+    } else if(action==='builder-save') {
+      const name=winEl.querySelector('#customName').value.trim(),type=winEl.querySelector('#customType').value,note=winEl.querySelector('#customNote').value.trim();
+      if(!name) return setStatus(winEl,'実験名を入力してください。','warn');
+      const items=safeRead('authlab.customDesigns',[]);items.push({name,type,note,createdAt:new Date().toISOString()});
+      safeWrite('authlab.customDesigns',items);
+      $('#customList',winEl).innerHTML=renderCustomList();setStatus(winEl,'設計メモを保存しました。','good');
+    } else if(action==='builder-delete') {
+      const items=safeRead('authlab.customDesigns',[]);items.splice(Number(button.dataset.index),1);safeWrite('authlab.customDesigns',items);
+      $('#customList',winEl).innerHTML=renderCustomList();
+    } else if(action==='cloud-save') {
+      const payload={
+        preferences:safeRead('authlab.preferences',{wallpaper:'aurora'}),
+        customDesigns:safeRead('authlab.customDesigns',[])
+      };
+      cloudCall('saveCloudData',payload,winEl);
+    } else if(action==='cloud-load') {
+      cloudCall('loadCloudData',null,winEl);
+    } else if(action==='settings-save') {
+      safeWrite('authlab.preferences',{wallpaper:winEl.querySelector('#wallpaper').value});
+      applyTheme();setStatus(winEl,'設定を保存しました。','good');
+    } else if(action==='settings-export') {
+      const data={preferences:safeRead('authlab.preferences',{}),customDesigns:safeRead('authlab.customDesigns',[]),exportedAt:new Date().toISOString(),note:'Auth Lab OS learning prototype. Does not include demo secrets.'};
+      const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='auth-lab-settings.json';a.click();URL.revokeObjectURL(url);
+      setStatus(winEl,'設定と設計メモをJSONとして書き出しました。認証用のデモ値は含めていません。','good');
+    } else if(action==='settings-clear') {
+      if(!confirm('このサイトの学習用データを初期化しますか？この操作は元に戻せません。')) return;
+      ['authlab.preferences','authlab.customDesigns','authlab.demo.password','authlab.demo.pin','authlab.demo.pattern','authlab.demo.image','authlab.demo.rhythm','authlab.demo.otp'].forEach(k=>{try{localStorage.removeItem(k)}catch(_){}});
+      appState.clear();applyTheme();setStatus(winEl,'学習用データを初期化しました。','good');
+      showToast('学習データを初期化しました。');
+    } else if(action==='api-check') {
+      apiDiagnostics(winEl);
+    } else if(action==='api-camera' || action==='api-mic') {
+      if(!navigator.mediaDevices?.getUserMedia) return setStatus(winEl,'このブラウザではMediaDevices APIを利用できません。','warn');
+      try { const stream=await navigator.mediaDevices.getUserMedia({video:action==='api-camera',audio:action==='api-mic'}); stream.getTracks().forEach(t=>t.stop()); setStatus(winEl,'許可を確認しました。テスト用ストリームは直ちに停止しました。','good'); }
+      catch(e) { setStatus(winEl,'許可されなかったか、デバイスを利用できません: '+(e.message||e.name),'warn'); }
+    } else if(action==='api-location') {
+      if(!navigator.geolocation) return setStatus(winEl,'Geolocation APIに対応していません。','warn');
+      navigator.geolocation.getCurrentPosition(pos=>setStatus(winEl,'位置情報の許可を確認しました。座標は保存していません。','good'),err=>setStatus(winEl,'位置情報を取得できません: '+err.message,'warn'),{timeout:10000,maximumAge:0});
+    } else if(action==='coming-soon') showToast('このアプリは今後のバージョンで実装予定です。');
+  }
+
+  function setupPattern(winEl,appId) {
+    winEl._selectedDots=[];
+    const saved=appState.get(appId)||safeRead('authlab.demo.pattern',null);
+    if(saved) appState.set(appId,saved);
+    winEl.querySelectorAll('[data-dot]').forEach(dot=>dot.addEventListener('click',()=>{
+      const n=Number(dot.dataset.dot),list=winEl._selectedDots;
+      if(list.includes(n)) return;
+      list.push(n);dot.classList.add('selected');
+      $('#patternCurrent',winEl).textContent='選択した点: '+list.map(i=>i+1).join(' → ');
+    }));
+  }
+
+  function applyTheme() {
+    const prefs=safeRead('authlab.preferences',{wallpaper:'aurora'});
+    const desktop=$('#desktop');
+    const themes={
+      aurora:'radial-gradient(ellipse at 18% 18%,rgba(68,107,170,.25),transparent 42%),radial-gradient(ellipse at 78% 72%,rgba(106,80,161,.22),transparent 43%),linear-gradient(135deg,#10131b,#171c28 58%,#10131b)',
+      midnight:'radial-gradient(ellipse at 50% 0%,rgba(70,95,130,.18),transparent 55%),linear-gradient(135deg,#080b10,#10141d)',
+      violet:'radial-gradient(ellipse at 18% 18%,rgba(111,80,180,.3),transparent 45%),radial-gradient(ellipse at 80% 70%,rgba(73,95,173,.2),transparent 42%),linear-gradient(135deg,#130f20,#1b1830)'
+    };
+    desktop.style.background=themes[prefs.wallpaper]||themes.aurora;
+  }
+
+  document.addEventListener('click',e=>{
+    const imageTile=e.target.closest('[data-image-tile]');
+    if(imageTile){
+      const winEl=imageTile.closest('.app-window');
+      const index=Number(imageTile.dataset.imageTile);
+      if(!imageSelection.includes(index)){imageSelection.push(index);imageTile.style.outline='2px solid var(--accent)';$('#imageCurrent',winEl).textContent='選択した順番: '+imageSelection.map(i=>['🍎','🌙','⭐','🐈','🌈','🚀','🍀','🎧','🔥'][i]).join(' → ');}
+      return;
+    }
+    const rhythmTap=e.target.closest('[data-rhythm-tap]');
+    if(rhythmTap){
+      const winEl=rhythmTap.closest('.app-window');
+      rhythmTimes.push(performance.now());
+      if(rhythmTimes.length>12) rhythmTimes=rhythmTimes.slice(-12);
+      $('#rhythmCurrent',winEl).textContent='記録したタップ: '+rhythmTimes.length;
+      rhythmTap.style.transform='scale(.96)';setTimeout(()=>rhythmTap.style.transform='',90);
+      return;
+    }
+    const open=e.target.closest('[data-open]');
+    if(open){createWindow(open.dataset.open);return;}
+    const task=e.target.closest('[data-task]');
+    if(task){
+      const id=task.dataset.task,win=windows.get(id);
+      if(!win)return;
+      if(!win.el.classList.contains('minimized')&&activeId===id) minimizeWindow(id);
+      else {win.el.classList.remove('minimized');focusWindow(id);}
+      return;
+    }
+    const action=e.target.closest('[data-action]');
+    if(action){handleAction(action);return;}
+    if(!e.target.closest('#startMenu')&&!e.target.closest('#startButton')) closeStartMenu();
+  });
+  startButton.addEventListener('click',toggleStartMenu);
+  $('#closeStart').addEventListener('click',closeStartMenu);
+  $('#appSearch').addEventListener('input',e=>renderAppLists(e.target.value));
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape') closeStartMenu();
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();if(startMenu.hidden)toggleStartMenu();$('#appSearch').focus();}
+  });
+  function updateClock(){
+    const now=new Date();
+    $('#clock').textContent=now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    $('#date').textContent=now.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
+  }
+  function hydrateDemoState() {
+    const password=safeRead('authlab.demo.password',null),pin=safeRead('authlab.demo.pin',null),pattern=safeRead('authlab.demo.pattern',null);
+    const image=safeRead('authlab.demo.image',null),rhythm=safeRead('authlab.demo.rhythm',null);
+    if(password)appState.set('password',password);
+    if(pin)appState.set('pin',pin);
+    if(pattern)appState.set('pattern',pattern);
+    if(image)appState.set('image',image);
+    if(rhythm)appState.set('rhythm',rhythm);
+  }
+  renderAppLists();hydrateDemoState();applyTheme();updateClock();setInterval(updateClock,15000);
+})();
+</script>
+</body>
+</html>

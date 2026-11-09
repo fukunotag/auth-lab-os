@@ -1,0 +1,162 @@
+
+/**
+ * Auth Lab OS - Google Apps Script backend
+ *
+ * Stores only preferences and custom experiment design notes.
+ * NEVER store passwords, PINs, patterns, OTP secrets, passkey private keys,
+ * biometric data, or real authentication credentials in this spreadsheet.
+ *
+ * This is a learning prototype, not a production authentication service.
+ */
+
+const AUTH_LAB_SHEET_PROPERTY = 'AUTH_LAB_SPREADSHEET_ID';
+const AUTH_LAB_MAX_PAYLOAD_BYTES = 20000;
+
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle('Auth Lab OS')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
+
+/**
+ * Optional: run once manually from the Apps Script editor.
+ * It creates the spreadsheet and returns its URL.
+ */
+function setupAuthLab() {
+  const ss = getOrCreateSpreadsheet_();
+  const result = {
+    ok: true,
+    spreadsheetId: ss.getId(),
+    spreadsheetUrl: ss.getUrl(),
+    message: 'Auth Lab OS storage is ready.'
+  };
+  console.log('Auth Lab OS spreadsheet: ' + ss.getUrl());
+  return result;
+}
+
+function loadCloudData(clientId) {
+  validateClientId_(clientId);
+  const ss = getOrCreateSpreadsheet_();
+  const sheet = getDataSheet_(ss);
+  const row = findClientRow_(sheet, clientId);
+  if (!row) {
+    return {
+      ok: true,
+      preferences: { wallpaper: 'aurora' },
+      customDesigns: [],
+      spreadsheetUrl: ss.getUrl(),
+      found: false
+    };
+  }
+
+  const raw = sheet.getRange(row, 2).getValue();
+  let payload = {};
+  try { payload = JSON.parse(String(raw || '{}')); } catch (e) {}
+  return {
+    ok: true,
+    preferences: sanitizePreferences_(payload.preferences),
+    customDesigns: sanitizeDesigns_(payload.customDesigns),
+    spreadsheetUrl: ss.getUrl(),
+    found: true
+  };
+}
+
+function saveCloudData(clientId, payload) {
+  validateClientId_(clientId);
+  const clean = sanitizePayload_(payload);
+  const serialized = JSON.stringify(clean);
+  if (Utilities.newBlob(serialized).getBytes().length > AUTH_LAB_MAX_PAYLOAD_BYTES) {
+    throw new Error('保存データが大きすぎます。設計メモを減らしてください。');
+  }
+
+  const ss = getOrCreateSpreadsheet_();
+  const sheet = getDataSheet_(ss);
+  const row = findClientRow_(sheet, clientId);
+  const now = new Date();
+
+  if (row) {
+    sheet.getRange(row, 2, 1, 2).setValues([[serialized, now]]);
+  } else {
+    sheet.appendRow([clientId, serialized, now]);
+  }
+
+  return {
+    ok: true,
+    savedAt: now.toISOString(),
+    spreadsheetUrl: ss.getUrl(),
+    message: 'Saved preferences and experiment notes.'
+  };
+}
+
+function getOrCreateSpreadsheet_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty(AUTH_LAB_SHEET_PROPERTY);
+  if (id) {
+    try { return SpreadsheetApp.openById(id); } catch (e) {}
+  }
+  const ss = SpreadsheetApp.create('Auth Lab OS Data');
+  props.setProperty(AUTH_LAB_SHEET_PROPERTY, ss.getId());
+  getDataSheet_(ss);
+  return ss;
+}
+
+function getDataSheet_(ss) {
+  let sheet = ss.getSheetByName('AppData');
+  if (!sheet) sheet = ss.insertSheet('AppData');
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Client ID', 'Payload JSON', 'Updated At']);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, 3).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function findClientRow_(sheet, clientId) {
+  const last = sheet.getLastRow();
+  if (last < 2) return 0;
+  const found = sheet.getRange(2, 1, last - 1, 1)
+    .createTextFinder(clientId).matchEntireCell(true).findNext();
+  return found ? found.getRow() : 0;
+}
+
+function validateClientId_(clientId) {
+  if (typeof clientId !== 'string' || !/^[a-f0-9-]{36}$/i.test(clientId)) {
+    throw new Error('不正なクライアントIDです。ページを再読み込みしてください。');
+  }
+}
+
+function sanitizePayload_(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('保存データの形式が不正です。');
+  }
+  return {
+    preferences: sanitizePreferences_(payload.preferences),
+    customDesigns: sanitizeDesigns_(payload.customDesigns)
+  };
+}
+
+function sanitizePreferences_(prefs) {
+  const allowed = ['aurora', 'midnight', 'violet'];
+  const wallpaper = prefs && allowed.indexOf(prefs.wallpaper) >= 0
+    ? prefs.wallpaper : 'aurora';
+  return { wallpaper: wallpaper };
+}
+
+function sanitizeDesigns_(designs) {
+  if (!Array.isArray(designs)) return [];
+  return designs.slice(0, 100).map(function(item) {
+    item = item && typeof item === 'object' ? item : {};
+    return {
+      name: cleanText_(item.name, 40),
+      type: cleanText_(item.type, 20),
+      note: cleanText_(item.note, 160),
+      createdAt: cleanText_(item.createdAt, 40)
+    };
+  }).filter(function(item) { return item.name.length > 0; });
+}
+
+function cleanText_(value, maxLength) {
+  return String(value == null ? '' : value)
+    .replace(/[<>\u0000-\u001f]/g, '')
+    .slice(0, maxLength);
+}
